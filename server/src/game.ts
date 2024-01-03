@@ -3,6 +3,8 @@ import { GameConstants, KillFeedMessageType, KillType, ObjectCategory, PacketTyp
 import { type ExplosionDefinition } from "../../common/src/definitions/explosions";
 import { type LootDefinition } from "../../common/src/definitions/loots";
 import { Obstacles, type ObstacleDefinition } from "../../common/src/definitions/obstacles";
+import { type SyncedParticleDefinition } from "../../common/src/definitions/syncedParticles";
+import { type ThrowableDefinition } from "../../common/src/definitions/throwables";
 import { InputPacket } from "../../common/src/packets/inputPacket";
 import { JoinPacket } from "../../common/src/packets/joinPacket";
 import { JoinedPacket } from "../../common/src/packets/joinedPacket";
@@ -13,7 +15,6 @@ import { CircleHitbox } from "../../common/src/utils/hitbox";
 import { Geometry, Numeric } from "../../common/src/utils/math";
 import { Timeout } from "../../common/src/utils/misc";
 import { ItemType, MapObjectSpawnMode, type ReferenceTo, type ReifiableDef } from "../../common/src/utils/objectDefinitions";
-import { ObjectPool } from "../../common/src/utils/objectPool";
 import { randomPointInsideCircle, randomRotation } from "../../common/src/utils/random";
 import { OBJECT_ID_BITS, type SuroiBitStream } from "../../common/src/utils/suroiBitStream";
 import { Vec, type Vector } from "../../common/src/utils/vector";
@@ -21,11 +22,10 @@ import { Config, SpawnMode } from "./config";
 import { Maps } from "./data/maps";
 import { Gas } from "./gas";
 import { type GunItem } from "./inventory/gunItem";
+import { type ThrowableItem } from "./inventory/throwableItem";
 import { Map } from "./map";
 import { Building } from "./objects/building";
 import { Bullet, type DamageRecord, type ServerBulletOptions } from "./objects/bullet";
-import { type DeathMarker } from "./objects/deathMarker";
-import { type Decal } from "./objects/decal";
 import { type Emote } from "./objects/emote";
 import { Explosion } from "./objects/explosion";
 import { type GameObject } from "./objects/gameObject";
@@ -33,53 +33,41 @@ import { Loot } from "./objects/loot";
 import { Obstacle } from "./objects/obstacle";
 import { Parachute } from "./objects/parachute";
 import { Player } from "./objects/player";
+import { SyncedParticle } from "./objects/syncedParticle";
+import { ThrowableProjectile } from "./objects/throwableProj";
 import { endGame, newGame, type PlayerContainer } from "./server";
 import { hasBadWords } from "./utils/badWordFilter";
 import { Grid } from "./utils/grid";
 import { IDAllocator } from "./utils/idAllocator";
 import { Logger, removeFrom } from "./utils/misc";
 
-interface ObjectMapping {
-    [ObjectCategory.Player]: Player
-    [ObjectCategory.Obstacle]: Obstacle
-    [ObjectCategory.DeathMarker]: DeathMarker
-    [ObjectCategory.Loot]: Loot
-    [ObjectCategory.Building]: Building
-    [ObjectCategory.Decal]: Decal
-    [ObjectCategory.Parachute]: Parachute
-}
-
 export class Game {
     readonly _id: number;
     get id(): number { return this._id; }
 
-    map: Map;
-
-    gas: Gas;
-
-    readonly grid: Grid<GameObject>;
+    readonly map: Map;
+    readonly gas: Gas;
+    readonly grid: Grid;
 
     readonly partialDirtyObjects = new Set<GameObject>();
     readonly fullDirtyObjects = new Set<GameObject>();
 
     updateObjects = false;
 
-    readonly objects = new ObjectPool<ObjectMapping>();
-
-    readonly livingPlayers: Set<Player> = new Set<Player>();
-    readonly connectedPlayers: Set<Player> = new Set<Player>();
+    readonly livingPlayers = new Set<Player>();
+    readonly connectedPlayers = new Set<Player>();
     readonly spectatablePlayers: Player[] = [];
     /**
      * New players created this tick
      */
-    readonly newPlayers: Set<Player> = new Set<Player>();
+    readonly newPlayers = new Set<Player>();
     /**
     * Players deleted this tick
     */
-    readonly deletedPlayers: Set<number> = new Set<number>();
+    readonly deletedPlayers = new Set<number>();
 
-    readonly explosions: Set<Explosion> = new Set<Explosion>();
-    readonly emotes: Set<Emote> = new Set<Emote>();
+    readonly explosions = new Set<Explosion>();
+    readonly emotes = new Set<Emote>();
     readonly parachutes = new Set<Parachute>();
 
     /**
@@ -104,7 +92,7 @@ export class Game {
     /**
      * All planes this tick
      */
-    readonly planes = new Set<{ position: Vector, direction: number }>();
+    readonly planes = new Set<{ readonly position: Vector, readonly direction: number }>();
 
     /**
      * All map pings this tick
@@ -113,8 +101,8 @@ export class Game {
 
     private readonly _timeouts = new Set<Timeout>();
 
-    addTimeout(callback: () => void, delay?: number): Timeout {
-        const timeout = new Timeout(callback, this.now + (delay ?? 0));
+    addTimeout(callback: () => void, delay = 0): Timeout {
+        const timeout = new Timeout(callback, this.now + delay);
         this._timeouts.add(timeout);
         return timeout;
     }
@@ -138,8 +126,6 @@ export class Game {
 
     tickTimes: number[] = [];
 
-    tickDelta = 1000 / GameConstants.tps;
-
     constructor(id: number) {
         this._id = id;
 
@@ -156,7 +142,7 @@ export class Game {
         Logger.log(`Game ${this.id} | Created in ${Date.now() - start} ms`);
 
         // Start the tick loop
-        this.tick(GameConstants.tps);
+        this.tick(GameConstants.msPerTick);
     }
 
     handlePacket(stream: SuroiBitStream, player: Player): void {
@@ -205,6 +191,7 @@ export class Game {
                     this._timeouts.delete(timeout);
                     continue;
                 }
+
                 if (this.now > timeout.end) {
                     timeout.callback();
                     this._timeouts.delete(timeout);
@@ -212,12 +199,20 @@ export class Game {
             }
 
             // Update loots
-            for (const loot of this.objects.getCategory(ObjectCategory.Loot)) {
+            for (const loot of this.grid.pool.getCategory(ObjectCategory.Loot)) {
                 loot.update();
             }
 
-            for (const parachute of this.objects.getCategory(ObjectCategory.Parachute)) {
+            for (const parachute of this.grid.pool.getCategory(ObjectCategory.Parachute)) {
                 parachute.update();
+            }
+
+            for (const projectile of this.grid.pool.getCategory(ObjectCategory.ThrowableProjectile)) {
+                projectile.update();
+            }
+
+            for (const syncedParticle of this.grid.pool.getCategory(ObjectCategory.SyncedParticle)) {
+                syncedParticle.update();
             }
 
             // Update bullets
@@ -250,7 +245,7 @@ export class Game {
             this.gas.tick();
 
             // First loop over players: Movement, animations, & actions
-            for (const player of this.objects.getCategory(ObjectCategory.Player)) {
+            for (const player of this.grid.pool.getCategory(ObjectCategory.Player)) {
                 if (!player.dead) player.update();
                 player.thisTickDirty = JSON.parse(JSON.stringify(player.dirty));
             }
@@ -275,7 +270,7 @@ export class Game {
             this.mapPings.clear();
             this.aliveCountDirty = false;
             this.gas.dirty = false;
-            this.gas.percentageDirty = false;
+            this.gas.completionRatioDirty = false;
             this.updateObjects = false;
 
             // Winning logic
@@ -309,11 +304,11 @@ export class Game {
             if (this.tickTimes.length >= 200) {
                 const mspt = this.tickTimes.reduce((a, b) => a + b) / this.tickTimes.length;
 
-                Logger.log(`Game ${this._id} | Avg ms/tick: ${mspt.toFixed(2)} | Load: ${((mspt / GameConstants.tps) * 100).toFixed(1)}%`);
+                Logger.log(`Game ${this._id} | Avg ms/tick: ${mspt.toFixed(2)} | Load: ${((mspt / GameConstants.msPerTick) * 100).toFixed(1)}%`);
                 this.tickTimes = [];
             }
 
-            this.tick(Math.max(0, GameConstants.tps - tickTime));
+            this.tick(Math.max(0, GameConstants.msPerTick - tickTime));
         }, delay);
     }
 
@@ -434,13 +429,13 @@ export class Game {
         player.loadout.emotes = packet.emotes;
 
         this.livingPlayers.add(player);
-        this.objects.add(player);
         this.spectatablePlayers.push(player);
         this.connectedPlayers.add(player);
         this.newPlayers.add(player);
         this.grid.addObject(player);
         this.fullDirtyObjects.add(player);
         this.aliveCountDirty = true;
+        this.updateObjects = true;
 
         player.joined = true;
 
@@ -456,7 +451,7 @@ export class Game {
             this.startTimeout = this.addTimeout(() => {
                 this._started = true;
                 this.startedTime = this.now;
-                this.gas.advanceGas();
+                this.gas.advanceGasStage();
 
                 this.addTimeout(() => {
                     newGame();
@@ -494,6 +489,7 @@ export class Game {
             this.startTimeout?.kill();
             this.startTimeout = undefined;
         }
+
         try {
             player.socket.close();
         } catch (e) { }
@@ -515,7 +511,6 @@ export class Game {
             count
         );
 
-        this.objects.add(loot);
         this.grid.addObject(loot);
         return loot;
     }
@@ -545,6 +540,28 @@ export class Game {
         return explosion;
     }
 
+    addProjectile(definition: ThrowableDefinition, position: Vector, source: ThrowableItem): ThrowableProjectile {
+        const projectile = new ThrowableProjectile(this, position, definition, source);
+        this.grid.addObject(projectile);
+        return projectile;
+    }
+
+    removeProjectile(projectile: ThrowableProjectile): void {
+        this.removeObject(projectile);
+        projectile.dead = true;
+    }
+
+    addSyncedParticle(definition: SyncedParticleDefinition, position: Vector): SyncedParticle {
+        const syncedParticle = new SyncedParticle(this, definition, position);
+        this.grid.addObject(syncedParticle);
+        return syncedParticle;
+    }
+
+    removeSyncedParticle(syncedParticle: SyncedParticle): void {
+        this.removeObject(syncedParticle);
+        syncedParticle.dead = true;
+    }
+
     /**
      * Delete an object and give the id back to the allocator
      * @param object The object to delete
@@ -553,7 +570,6 @@ export class Game {
         this.grid.removeObject(object);
         this.idAllocator.give(object.id);
         this.updateObjects = true;
-        this.objects.delete(object as ObjectMapping[ObjectCategory]);
     }
 
     summonAirdrop(position: Vector): void {
@@ -583,10 +599,12 @@ export class Game {
             thisHitbox = crateHitbox.transform(position);
 
             for (const object of this.grid.intersectsHitbox(thisHitbox)) {
-                if (object instanceof Obstacle &&
+                if (
+                    object instanceof Obstacle &&
                     !object.dead &&
                     object.definition.indestructible &&
-                    object.spawnHitbox.collidesWith(thisHitbox)) {
+                    object.spawnHitbox.collidesWith(thisHitbox)
+                ) {
                     collided = true;
                     thisHitbox.resolveCollision(object.spawnHitbox);
                 }
@@ -630,7 +648,6 @@ export class Game {
         this.addTimeout(() => {
             const parachute = new Parachute(this, position, airdrop);
             this.grid.addObject(parachute);
-            this.objects.add(parachute);
             this.mapPings.add(position);
         }, GameConstants.airdrop.flyTime);
     }
@@ -647,6 +664,6 @@ export class Game {
 }
 
 export interface Airdrop {
-    position: Vector
-    type: ObstacleDefinition
+    readonly position: Vector
+    readonly type: ObstacleDefinition
 }

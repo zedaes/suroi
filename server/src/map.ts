@@ -16,7 +16,7 @@ import { type Game } from "./game";
 import { Building } from "./objects/building";
 import { Decal } from "./objects/decal";
 import { Obstacle } from "./objects/obstacle";
-import { Logger, getLootTableLoot, getRandomIdString } from "./utils/misc";
+import { Logger, getLootTableLoot, getRandomIDString } from "./utils/misc";
 
 export class Map {
     readonly game: Game;
@@ -86,30 +86,25 @@ export class Map {
 
         if (mapDefinition.rivers) {
             const riverDef = mapDefinition.rivers;
-
             const riverPadding = 64;
+            const randomGenerator = new SeededRandom(this.seed);
+            const amount = randomGenerator.getInt(riverDef.minAmount, riverDef.maxAmount);
 
+            // generate a list of widths and sort by biggest, to make sure wide rivers generate first
+            const widths = Array.from(
+                { length: amount },
+                () => randomGenerator.get() < riverDef.wideChance
+                    ? randomGenerator.getInt(riverDef.minWideWidth, riverDef.maxWideWidth)
+                    : randomGenerator.getInt(riverDef.minWidth, riverDef.maxWidth)
+            ).sort((a, b) => b - a);
+
+            // extracted form loop
+            const halfWidth = this.width / 2;
+            const halfHeight = this.height / 2;
             const riverRect = new RectangleHitbox(
                 Vec.create(riverPadding, riverPadding),
                 Vec.create(this.width - riverPadding, this.height - riverPadding)
             );
-
-            const randomGenerator = new SeededRandom(this.seed);
-
-            const widths: number[] = [];
-            const amount = randomGenerator.getInt(riverDef.minAmount, riverDef.maxAmount);
-
-            // generate a list of widths and sort by biggest, to make sure wide rivers generate first
-            for (let i = 0; i < amount; i++) {
-                const wide = randomGenerator.get() < riverDef.wideChance;
-                widths.push(wide
-                    ? randomGenerator.getInt(riverDef.minWideWidth, riverDef.maxWideWidth)
-                    : randomGenerator.getInt(riverDef.minWidth, riverDef.maxWidth));
-            }
-            widths.sort((a, b) => b - a);
-
-            const halfWidth = this.width / 2;
-            const halfHeight = this.height / 2;
             const center = Vec.create(halfWidth, halfHeight);
             const width = this.width - riverPadding;
             const height = this.height - riverPadding;
@@ -132,7 +127,7 @@ export class Map {
                     start = Vec.create(reverse ? rightHalf : leftHalf, riverPadding);
                 }
 
-                const startAngle = Angle.angleBetweenPoints(center, start) + (reverse ? 0 : Math.PI);
+                const startAngle = Angle.betweenPoints(center, start) + (reverse ? 0 : Math.PI);
 
                 this.generateRiver(
                     start,
@@ -145,7 +140,8 @@ export class Map {
             }
         }
 
-        this.packet.rivers = rivers;
+        this.packet.rivers.length = 0;
+        this.packet.rivers.push(...rivers);
 
         this.terrain = new Terrain(
             this.width,
@@ -243,7 +239,11 @@ export class Map {
         }
         if (riverPoints.length < 20 || riverPoints.length > 59) return;
 
-        rivers.push(new River(width, riverPoints, rivers));
+        const mapBounds = new RectangleHitbox(
+            Vec.create(this.oceanSize, this.oceanSize),
+            Vec.create(this.width - this.oceanSize, this.height - this.oceanSize)
+        );
+        rivers.push(new River(width, riverPoints, rivers, mapBounds));
     }
 
     generateBuildings(definition: ReifiableDef<BuildingDefinition>, count: number): void {
@@ -280,7 +280,7 @@ export class Map {
         const building = new Building(this.game, definition, Vec.clone(position), orientation);
 
         for (const obstacleData of definition.obstacles ?? []) {
-            const obstacleDef = Obstacles.fromString(getRandomIdString(obstacleData.idString));
+            const obstacleDef = Obstacles.fromString(getRandomIDString(obstacleData.idString));
             let obstacleRotation = obstacleData.rotation ?? Map.getRandomRotation(obstacleDef.rotationMode);
 
             if (obstacleDef.rotationMode === RotationMode.Limited) {
@@ -298,7 +298,8 @@ export class Map {
                 obstacleData.scale ?? 1,
                 obstacleData.variation,
                 lootSpawnOffset,
-                building
+                building,
+                obstacleData.puzzlePiece
             );
 
             if (obstacleDef.role === ObstacleSpecialRoles.Activatable ||
@@ -328,7 +329,7 @@ export class Map {
         for (const subBuilding of definition.subBuildings ?? []) {
             const finalOrientation = Numeric.addOrientations(orientation, subBuilding.orientation ?? 0);
             this.generateBuilding(
-                getRandomIdString(subBuilding.idString),
+                getRandomIDString(subBuilding.idString),
                 Vec.addAdjust(position, subBuilding.position, finalOrientation),
                 finalOrientation
             );
@@ -339,7 +340,7 @@ export class Map {
         }
 
         for (const decal of definition.decals ?? []) {
-            this.game.grid.addObject(new Decal(this.game, Decals.reify(decal.id), Vec.addAdjust(position, decal.position, orientation), Numeric.addOrientations(orientation, decal.orientation ?? 0)));
+            this.game.grid.addObject(new Decal(this.game, Decals.reify(decal.idString), Vec.addAdjust(position, decal.position, orientation), Numeric.addOrientations(orientation, decal.orientation ?? 0)));
         }
 
         if (!definition.hideOnMap) this.packet.objects.push(building);
@@ -351,7 +352,7 @@ export class Map {
         definition = Obstacles.reify(definition);
 
         for (let i = 0; i < count; i++) {
-            const scale = randomFloat(definition.scale.spawnMin, definition.scale.spawnMax);
+            const scale = randomFloat(definition.scale?.spawnMin ?? 1, definition.scale?.spawnMax ?? 1);
             const variation = (definition.variations !== undefined ? random(0, definition.variations - 1) : 0) as Variation;
             const rotation = Map.getRandomRotation(definition.rotationMode);
 
@@ -385,11 +386,12 @@ export class Map {
         scale?: number,
         variation?: Variation,
         lootSpawnOffset?: Vector,
-        parentBuilding?: Building
+        parentBuilding?: Building,
+        puzzlePiece?: string | boolean
     ): Obstacle {
         definition = Obstacles.reify(definition);
 
-        scale ??= randomFloat(definition.scale.spawnMin, definition.scale.spawnMax);
+        scale ??= randomFloat(definition.scale?.spawnMin ?? 1, definition.scale?.spawnMax ?? 1);
         if (variation === undefined && definition.variations) {
             variation = random(0, definition.variations - 1) as Variation;
         }
@@ -404,7 +406,8 @@ export class Map {
             scale,
             variation,
             lootSpawnOffset,
-            parentBuilding
+            parentBuilding,
+            puzzlePiece
         );
 
         if (!definition.hideOnMap) this.packet.objects.push(obstacle);
@@ -552,7 +555,7 @@ export class Map {
             for (const object of objects) {
                 let objectHitbox: Hitbox | undefined;
                 if ("spawnHitbox" in object) {
-                    objectHitbox = object.spawnHitbox as Hitbox;
+                    objectHitbox = object.spawnHitbox;
                 } else if (object.hitbox) {
                     objectHitbox = object.hitbox;
                 }
