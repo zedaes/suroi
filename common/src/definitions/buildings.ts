@@ -1931,15 +1931,18 @@ export const Buildings = new ObjectDefinitions<BuildingDefinition>([
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-60, -25)
+                position: Vec.create(60, 25),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-45, -25)
+                position: Vec.create(45, 25),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-30, -25)
+                position: Vec.create(30, 25),
+                orientation: 2
             },
             // Group 2
             {
@@ -1956,15 +1959,18 @@ export const Buildings = new ObjectDefinitions<BuildingDefinition>([
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(5, -25)
+                position: Vec.create(-5, 25),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(20, -25)
+                position: Vec.create(-20, 25),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(35, -25)
+                position: Vec.create(-35, 25),
+                orientation: 2
             },
             // Group 3
             {
@@ -1981,15 +1987,18 @@ export const Buildings = new ObjectDefinitions<BuildingDefinition>([
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-100, -90)
+                position: Vec.create(100, 90),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-115, -90)
+                position: Vec.create(115, 90),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(-130, -90)
+                position: Vec.create(130, 90),
+                orientation: 2
             },
 
             // Group 4
@@ -2007,15 +2016,18 @@ export const Buildings = new ObjectDefinitions<BuildingDefinition>([
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(82.5, -30)
+                position: Vec.create(-82.5, 30),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(97.5, -30)
+                position: Vec.create(-97.5, 30),
+                orientation: 2
             },
             {
                 idString: randomContainer2,
-                position: Vec.create(112.5, -30)
+                position: Vec.create(-112.5, 30),
+                orientation: 2
             }
         ]
     },
