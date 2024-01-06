@@ -578,32 +578,27 @@ Video evidence is required.`)) {
     const maxWeapons = GameConstants.player.maxWeapons;
     for (let slot = 0; slot < maxWeapons; slot++) {
         const slotElement = $(`#weapon-slot-${slot + 1}`);
-        slotElement[0].addEventListener(
-            "pointerdown",
-            (e: PointerEvent): void => {
-                if (slotElement.hasClass("has-item")) {
-                    e.stopImmediatePropagation();
-                    game.inputManager.addAction({
-                        type: e.button === 2 ? InputActions.DropItem : InputActions.EquipItem,
-                        slot
-                    });
-                }
+        slotElement[0].addEventListener("pointerdown", (e: PointerEvent): void => {
+            if (slotElement.hasClass("has-item")) {
+                e.stopImmediatePropagation();
+                game.inputManager.addAction({
+                    type: e.button === 2 ? InputActions.DropItem : InputActions.EquipItem,
+                    slot
+                });
             }
-        );
-                // drop item for mobile
-        slotElement[0].addEventListener(
-            "dblclick",
-            (e: PointerEvent): void => {
-                if (slotElement.hasClass("has-item")) {
-                    e.stopImmediatePropagation();
-                    game.inputManager.addAction({
-                        type: InputActions.DropItem,
-                        slot
-                    });
-                }
-            }
-        );
+        });
 
+        // drop item for mobile
+        slotElement[0].addEventListener("dblclick", (e: PointerEvent): void => {
+            if (slotElement.hasClass("has-item")) {
+                e.stopImmediatePropagation();
+                game.inputManager.addAction({
+                    type: InputActions.DropItem,
+                    slot
+                });
+                game.pickupCooldown = Date.now();
+            }
+        });
     }
 
     // Generate the UI for scopes, healing items and ammos

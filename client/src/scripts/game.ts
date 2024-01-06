@@ -101,6 +101,8 @@ export class Game {
 
     lastPingDate = 0;
 
+    pickupCooldown?: number;
+
     private _tickTimeoutID: number | undefined;
 
     readonly pixi: Application<HTMLCanvasElement>;
@@ -717,6 +719,7 @@ export class Game {
                     (
                         ( // Auto pickup
                             object instanceof Loot &&
+                            !(this.pickupCooldown && Date.now() - this.pickupCooldown < 2000) &&
                             // Only pick up melees if no melee is equipped
                             (type !== ItemType.Melee || this.uiManager.inventory.weapons?.[2]?.definition.idString === "fists") &&
                             // Only pick up guns if there's a free slot
