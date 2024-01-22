@@ -26,3 +26,6 @@ build/
 .pnpm-cache/
 .npm/
 *.log
+
+# pocketbase
+pb_data/
