@@ -42,6 +42,10 @@ export const Config = {
         "123op": { password: "123op" },
         radians: { password: "radians" },
         limenade: { password: "limenade" }
+    },
+
+    pocketBase: {
+        host: "http://127.0.0.1:8090"
     }
 } satisfies ConfigType as ConfigType;
 
@@ -183,4 +187,11 @@ export interface ConfigType {
      * Disables the lobbyClearing option if set to true
      */
     readonly disableLobbyClearing?: boolean
+
+    /**
+     * If this option is specified, the server will use PocketBase to store account data.
+     */
+    readonly pocketBase?: {
+        readonly host: string
+    }
 }
