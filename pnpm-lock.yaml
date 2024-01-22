@@ -145,6 +145,12 @@ importers:
       '@damienvesper/bit-buffer':
         specifier: ^1.0.0
         version: 1.0.0
+      dotenv:
+        specifier: ^16.3.2
+        version: 16.3.2
+      pocketbase:
+        specifier: ^0.20.3
+        version: 0.20.3
       uWebSockets.js:
         specifier: github:uNetworking/uWebSockets.js#v20.34.0
         version: github.com/uNetworking/uWebSockets.js/fca27c05066342b01951782248640c8013b37196
@@ -2627,6 +2633,11 @@ packages:
       domhandler: 5.0.3
     dev: true
 
+  /dotenv@16.3.2:
+    resolution: {integrity: sha512-HTlk5nmhkm8F6JcdXvHIzaorzCoziNQT9mGxLPVXW8wJF1TiGSL60ZGB4gHWabHOaMmWmhvk2/lPHfnBiT78AQ==}
+    engines: {node: '>=12'}
+    dev: false
+
   /dynamic-dedupe@0.3.0:
     resolution: {integrity: sha512-ssuANeD+z97meYOqd50e04Ze5qp4bPqo8cCkI4TRjZkzAUgIDTrXV1R8QCdINpiI+hw14+rYazvTRdQrz0/rFQ==}
     dependencies:
@@ -4157,6 +4168,10 @@ packages:
       '@pixi/text': 7.3.3(@pixi/core@7.3.3)(@pixi/sprite@7.3.3)
       '@pixi/text-bitmap': 7.3.3(@pixi/assets@7.3.3)(@pixi/core@7.3.3)(@pixi/display@7.3.3)(@pixi/mesh@7.3.3)(@pixi/text@7.3.3)
       '@pixi/text-html': 7.3.3(@pixi/core@7.3.3)(@pixi/display@7.3.3)(@pixi/sprite@7.3.3)(@pixi/text@7.3.3)
+    dev: false
+
+  /pocketbase@0.20.3:
+    resolution: {integrity: sha512-qembHhE7HumDBZpxWgFIbhJPeaCoUIdwhW59xF/VlMR79pDTYz/LaQ4q89y7GczKo4X9actFgFN8hs4dTl0spQ==}
     dev: false
 
   /postcss-attribute-case-insensitive@6.0.2(postcss@8.4.32):

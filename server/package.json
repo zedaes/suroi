@@ -29,6 +29,8 @@
   },
   "dependencies": {
     "@damienvesper/bit-buffer": "^1.0.0",
+    "dotenv": "^16.3.2",
+    "pocketbase": "^0.20.3",
     "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.34.0",
     "ws": "^8.16.0"
   }
