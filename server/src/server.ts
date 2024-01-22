@@ -363,7 +363,7 @@ app.listen(Config.host, Config.port, async(): Promise<void> => {
 
     // Connect to pocketbase
     const { pocketbase } = pb;
-    if (pocketbase) Logger.log("Pocketbase is disabled");
+    if (!pocketbase) Logger.log("Pocketbase is disabled");
     else {
         // Try login
         await pb.login();
