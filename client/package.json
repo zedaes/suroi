@@ -45,6 +45,7 @@
     "@pixi/sound": "^5.2.2",
     "jquery": "^3.7.1",
     "nipplejs": "^0.10.1",
-    "pixi.js": "7.3.3"
+    "pixi.js": "7.3.3",
+    "pocketbase": "^0.20.3"
   }
 }

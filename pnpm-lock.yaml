@@ -53,6 +53,9 @@ importers:
       pixi.js:
         specifier: 7.3.3
         version: 7.3.3
+      pocketbase:
+        specifier: ^0.20.3
+        version: 0.20.3
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^3.0.0
