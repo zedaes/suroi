@@ -9,6 +9,9 @@ import { Config } from "./config";
 import { Game } from "./game";
 import { type Player } from "./objects/player";
 import { Logger } from "./utils/misc";
+// @ts-expect-error screw es modules
+import Pocketbase from "pocketbase/cjs";
+import "dotenv/config";
 
 /**
  * Apply CORS headers to a response.
@@ -23,6 +26,23 @@ function cors(res: HttpResponse): void {
 
 function forbidden(res: HttpResponse): void {
     res.writeStatus("403 Forbidden").end("403 Forbidden");
+}
+
+// Pocketbase utilities
+async function pb(): Promise<Pocketbase | undefined> {
+    if (!Config.pocketBase) return undefined;
+    const pocketbase = new Pocketbase(Config.pocketBase.host);
+
+    // Attempt sign in
+    if (!process.env.POCKETBASE_USERNAME || !process.env.POCKETBASE_PASSWORD) throw new Error("Pocketbase username or password not specified");
+    try {
+        await pocketbase.admins.authWithPassword(process.env.POCKETBASE_USERNAME, process.env.POCKETBASE_PASSWORD);
+    } catch (err) {
+        Logger.warn("Failed to login to Pocketbase! Check host and credentials.");
+        throw err;
+    }
+
+    return pocketbase;
 }
 
 // Initialize the server
@@ -344,7 +364,7 @@ app.ws("/play", {
 });
 
 // Start the server
-app.listen(Config.host, Config.port, (): void => {
+app.listen(Config.host, Config.port, async(): Promise<void> => {
     console.log(
         `
  _____ _   _______ _____ _____
@@ -358,6 +378,11 @@ app.listen(Config.host, Config.port, (): void => {
     Logger.log(`Suroi Server v${version}`);
     Logger.log(`Listening on ${Config.host}:${Config.port}`);
     Logger.log("Press Ctrl+C to exit.");
+
+    // Connect to pocketbase
+    const pocketbase = await pb();
+    if (!pocketbase) Logger.log("Pocketbase is disabled");
+    else Logger.log(`Logged into Pocketbase instance at ${Config.pocketBase!.host}`);
 
     newGame(0);
 
