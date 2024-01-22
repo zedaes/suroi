@@ -27,6 +27,10 @@ function forbidden(res: HttpResponse): void {
     res.writeStatus("403 Forbidden").end("403 Forbidden");
 }
 
+function unauthorized(res: HttpResponse): void {
+    res.writeStatus("401 Unauthorized").end("401 Unauthorized");
+}
+
 // Initialize the server
 const app = Config.ssl
     ? SSLApp({
@@ -200,6 +204,7 @@ export interface PlayerContainer {
     readonly isDev: boolean
     readonly nameColor?: number
     readonly lobbyClearing: boolean
+    readonly accountId?: string
 }
 
 app.ws("/play", {
@@ -209,7 +214,7 @@ app.ws("/play", {
     /**
      * Upgrade the connection to WebSocket.
      */
-    upgrade(res, req, context) {
+    async upgrade(res, req, context) {
         /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         res.onAborted((): void => { });
 
@@ -282,6 +287,22 @@ app.ws("/play", {
         }
 
         //
+        // Account
+        //
+        let accountId: string | undefined;
+        // Not using Authorization header to allow for HTTP Basic to work seamlessly
+        const auth = req.getHeader("X-Suroi-Auth");
+        if (auth && pb.pocketbase) {
+            // Check if the token is valid
+            const id = await pb.checkToken(auth);
+            if (!id) {
+                unauthorized(res);
+                return;
+            }
+            accountId = id;
+        }
+
+        //
         // Upgrade the connection
         //
         const userData: PlayerContainer = {
@@ -291,7 +312,8 @@ app.ws("/play", {
             role,
             isDev,
             nameColor,
-            lobbyClearing: searchParams.get("lobbyClearing") === "true"
+            lobbyClearing: searchParams.get("lobbyClearing") === "true",
+            accountId
         };
         res.upgrade(
             userData,
