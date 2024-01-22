@@ -29,3 +29,9 @@ build/
 
 # pocketbase
 pocketbase/
+
+# env var
+.env
+.env.local
+.env.development
+.env.dev
